@@ -13,34 +13,29 @@ class Keypoint:
         self.position = position
 
 class PianoDetection:
-    def __init__(self, blur: int = 15, canny_th1: int = 10, canny_th2: int = 30):
+    def __init__(self):
+        # Frame procces steps
         self.frame_gray = None
         self.frame_blur = None
         self.frame_bin = None
 
-        self.paper_bbox = None
         self.paper_approx = None
 
-        self.warped_size = (300, 300)
-        self.transform_matrix = None
-        self.paper_warp = np.zeros((*self.warped_size, 3), dtype=np.uint8)
-        self.paper_warp_bin = np.zeros((*self.warped_size, 1), dtype=np.uint8)
+        # 200x200 is a starting size of warped image
+        self.paper_warp = np.zeros((*(200, 200), 3), dtype=np.uint8)
+        self.paper_warp_bin = np.zeros((*(200, 200), 1), dtype=np.uint8)
         
-        self.points_warped = []
-        self.points_og = []
-        
-        self.blur = blur
-        self.canny_th1 = canny_th1
-        self.canny_th2 = canny_th2
+        # Detected piano points
+        self.piano_points = []
 
-    def process(self, frame: MatLike):
+    def process(self, frame: MatLike, blur: int, canny_th1: int, canny_th2: int):
         """
         Detects paper in a frame, and sets steps of proccessing to a attributes.
         Returns true if paper was found, otherwise false.
         """
         self.frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        self.frame_blur = cv2.GaussianBlur(self.frame_gray, (self.blur, self.blur), 0)
-        self.frame_bin = cv2.Canny(self.frame_blur, self.canny_th1, self.canny_th2, L2gradient=True)
+        self.frame_blur = cv2.GaussianBlur(self.frame_gray, (blur, blur), 0)
+        self.frame_bin = cv2.Canny(self.frame_blur, canny_th1, canny_th2, L2gradient=True)
         kernel = np.ones((4,4),np.uint8)
         self.frame_bin = cv2.morphologyEx(self.frame_bin, cv2.MORPH_DILATE, kernel)
 
@@ -48,13 +43,11 @@ class PianoDetection:
 
         # No contour was found
         if not contours:
-            self.paper_bbox = None
             self.paper_approx = None
             return
 
         # Finds largest rectangle
-        self.paper_approx = _find_largest_rectangle(contours, 0.01)
-        print(self.paper_approx)
+        self.paper_approx = find_largest_rectangle(contours, 0.01)
 
         # No rectangle was found
         if self.paper_approx is None:
@@ -62,27 +55,26 @@ class PianoDetection:
 
         # Source points for 4 point transform
         src_points = self.paper_approx.copy().reshape((4, 2))
-        src_points = _order_points(src_points)
+        src_points = order_points(src_points)
         
         # Calculates dimensions for warped image
         width = int(cv2.norm(src_points[0], src_points[1]))
         height = int(cv2.norm(src_points[0], src_points[3]))
-        self.warped_size = (width, height)
         
         # Destination points
         dst_points = np.array(
             [[0, 0], # Top left
-             [self.warped_size[0], 0], # Top right
-             [self.warped_size[0], self.warped_size[1]], # Bottom right
-             [0, self.warped_size[1]]], # Bottom left
+             [width, 0], # Top right
+             [width, height], # Bottom right
+             [0, height]], # Bottom left
             dtype="float32"
         )
 
         # Computes the perspective transformation matrix
-        self.transform_matrix = cv2.getPerspectiveTransform(src_points, dst_points)
+        transform_matrix = cv2.getPerspectiveTransform(src_points, dst_points)
 
         # Creates warped image
-        self.paper_warp = cv2.warpPerspective(frame, self.transform_matrix, self.warped_size)
+        self.paper_warp = cv2.warpPerspective(frame, transform_matrix, (width, height))
         
         # Preperes warped image for extracting points
         extraction = cv2.cvtColor(self.paper_warp, cv2.COLOR_BGR2GRAY)
@@ -93,7 +85,7 @@ class PianoDetection:
         extraction = cv2.morphologyEx(extraction, cv2.MORPH_OPEN, kernel)
         
         # Removes unwanted edges
-        extraction = _add_inside_border(extraction, 15)
+        extraction = add_inside_border(extraction, 15)
         
         # Thicken cirles to make them easier to detect
         kernel = np.ones((3,3),np.uint8)
@@ -116,14 +108,11 @@ class PianoDetection:
             if w > 6 and h > 6:
                 points.append((x+w/2, y+h/2))
         
-        # Assign points sorted along x axis
-        self.points_warped = sorted(points, key=lambda pt: pt[0])
-        
         # Reshapes points for transform
         points = np.array(points, np.float32).reshape(-1, 1, 2)
 
         # Computes inverse matrix
-        inverse_matrix = np.linalg.inv(self.transform_matrix)
+        inverse_matrix = np.linalg.inv(transform_matrix)
 
         # Applies the inverse perspective transformation to map points back to the original image
         original_points = cv2.perspectiveTransform(points, inverse_matrix)
@@ -131,15 +120,7 @@ class PianoDetection:
         
         # Assign sorted points by x axis
         original_points = [tuple(row) for row in original_points.astype(object)]
-        self.points_og = sorted(original_points, key=lambda pt: pt[0])
-
-    def draw_bbox(self, img: MatLike):
-        """Draws bounding box of detected paper, if exists"""
-        if self.paper_bbox is None:
-            return
-
-        # Draws green rectangle
-        cv2.rectangle(img, self.paper_bbox[:2], np.add(self.paper_bbox[:2], self.paper_bbox[2:]), (0, 255, 0), 2)
+        self.piano_points = sorted(original_points, key=lambda pt: pt[0])
 
     def draw_contour(self, img: MatLike):
         """Draws contour and vertices of detected paper, if exists"""
@@ -151,61 +132,30 @@ class PianoDetection:
         # Draws red vetices
         for point in self.paper_approx:
             cv2.circle(img, tuple(point[0]), 5, (0, 0, 255), -1)
-
-    def draw_points_warped(self, img: MatLike):
-        """Draws warped points, if exists"""
-        if self.points_warped is None:
-            return
-        
-        for point in self.points_warped:
-            cv2.circle(img, point, 5, (255, 0, 0), -1)
     
-    def draw_points_og(self, img: MatLike):
+    def draw_points(self, img: MatLike, labeled: bool = True):
         """Draws original points, if exists"""
-        if self.points_og is None:
+        if self.piano_points is None:
             return
         
-        # Define the text and properties
-        text = ""
-        position = None # Bottom-left corner of the text
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.7
-        color = (255, 0, 0)  # White color in BGR
-        thickness = 2
-        i = 0  
-        for point in self.points_og:
-            text = str(i)
-            position = (int(point[0]-10), int(point[1]-10))
+        # Draws circles
+        for point in self.piano_points:
             cv2.circle(img, (int(point[0]), int(point[1])), 5, (255, 0, 0), -1)
-            cv2.putText(img, text, position, font, font_scale, color, thickness)
-            i+=1
-
-
-class PianoDetectionControls:
-    def __init__(self, piano_detection: PianoDetection):
-        self.piano_detection = piano_detection
-
-    def show_trackbars(self, window_name: str):
-        "Creates a windows with trackbars for configurable values of PianoDetection"
-        cv2.namedWindow(window_name)
-        cv2.createTrackbar("Blur Strenght", window_name, self.piano_detection.blur, 30, self._blur_change)
-        cv2.createTrackbar(
-            "Canny threschold1", window_name, self.piano_detection.canny_th1, 200, self._canny_th1_change
-        )
-        cv2.createTrackbar(
-            "Canny threschold2", window_name, self.piano_detection.canny_th2, 200, self._canny_th2_change
-        )
-
-    def _blur_change(self, val):
-        if val % 2 == 1:  # Only odd values are valid
-            self.piano_detection.blur = val
-
-    def _canny_th1_change(self, val):
-        self.piano_detection.canny_th1 = val
-
-    def _canny_th2_change(self, val):
-        self.piano_detection.canny_th2 = val
-
+            
+        if labeled:
+            # Define the text and properties
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.7
+            color = (255, 0, 0)
+            thickness = 2
+            
+            i = 0
+            # Draws text
+            for point in self.piano_points:
+                text = str(i)
+                position = (int(point[0]-10), int(point[1]-10))
+                cv2.putText(img, text, position, font, font_scale, color, thickness)
+                i+=1
 
 class HandDetection:
     def __init__(self):
@@ -254,7 +204,7 @@ class HandDetection:
             _mp_drawing.draw_landmarks(img, landmarks, _mp_hands.HAND_CONNECTIONS)
     
     
-def _order_points(pts: MatLike) -> MatLike:
+def order_points(pts: MatLike) -> MatLike:
     """Orders 4 points to be in clockwise order starting from top left"""
     ordered_points = np.zeros((4, 2), dtype="float32")
 
@@ -272,12 +222,12 @@ def _order_points(pts: MatLike) -> MatLike:
     # return the ordered coordinates
     return ordered_points
 
-def _find_largest_rectangle(contours: MatLike, epsilon_mult: float) -> MatLike:
+def find_largest_rectangle(contours: MatLike, epsilon_mult: float) -> MatLike:
     """Finds largest contour by bounding box"""
     max_area = 0
     largest_rect = None
     for contour in contours:
-        approx = _approximate_contour(contour, epsilon_mult)
+        approx = approximate_contour(contour, epsilon_mult)
         area = cv2.contourArea(approx)
 
         if area > max_area and cv2.isContourConvex(approx) and len(approx) == 4:
@@ -286,14 +236,14 @@ def _find_largest_rectangle(contours: MatLike, epsilon_mult: float) -> MatLike:
 
     return largest_rect
 
-def _approximate_contour(contour: MatLike, epsilon_mult: float) -> MatLike:
+def approximate_contour(contour: MatLike, epsilon_mult: float) -> MatLike:
     """Approximates the contour to reduce the number of points"""
     epsilon = epsilon_mult * cv2.arcLength(contour, True)
     approx = cv2.approxPolyDP(contour, epsilon, True)
 
     return approx
 
-def _add_inside_border(img: MatLike, width: int) -> MatLike:
+def add_inside_border(img: MatLike, width: int) -> MatLike:
     """Adds inside black border of specified width"""
     img_cpy = img.copy()
     img_cpy[:width, :] = 0

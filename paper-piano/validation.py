@@ -18,8 +18,8 @@ class TouchValidator:
         ) -> set[int]:
         """
         Checks if piano points are close enough to fingertip.
-        Returns indexes of piano points that were not previously touched
-        but are touched now.
+        Returns indexes of piano points that were not previously being 
+        touched but are being touched now.
         """
         # Number of given points is diffrent than tracked points
         if len(piano_points) != len(self.tracked_points):
