@@ -46,10 +46,9 @@ class PianoPlayer:
         if number_of_keys == 1:
             return [self._sound_filenames[lenght//2]]
         
-        # Calcualte distance between each key
+        # Calcualte distance between each file
         step = (lenght - 1) / (number_of_keys - 1)
         
-        # Adds every file name whose index is eqaul to rounded step * i
         result = []
         for i in range(number_of_keys):
             result.append(self._sound_filenames[round(step * i)])
