@@ -1,7 +1,7 @@
 import cv2
-from cv2.typing import MatLike
-import numpy as np
 import mediapipe as mp
+import numpy as np
+from cv2.typing import MatLike
 
 _mp_drawing = mp.solutions.drawing_utils
 _mp_hands = mp.solutions.hands

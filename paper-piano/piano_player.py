@@ -1,7 +1,8 @@
-from threading import Thread
-from playsound import playsound
 import os
 import re
+from threading import Thread
+from playsound import playsound
+
 
 UNIFORM_SOUND_SELECTION = 0
 MIDDLE_SOUND_SELECTION = 1
@@ -32,7 +33,7 @@ class PianoPlayer:
         else:
             selected_sounds = self._select_sounds_middle(number_of_keys)
         
-        # Play given keys
+        # Plays given keys
         for index in play_indexes:
             filename = selected_sounds[index]
             # Creates and starts a new sound thread
@@ -42,7 +43,7 @@ class PianoPlayer:
         # Selects given number of keys by selecting every n-th key
         lenght = len(self._sound_filenames)
         
-        # If number of keys is 1 return middle element
+        # If number of keys is 1 returns middle element
         if number_of_keys == 1:
             return [self._sound_filenames[lenght//2]]
         
@@ -57,7 +58,7 @@ class PianoPlayer:
     
     def _select_sounds_middle(self, number_of_keys: int) -> list[str]:
         # Selects given number of keys from the middle of filelist
-        # If number of keys is 1 return middle element
+        # If number of keys is 1 returns middle element
         if number_of_keys == 1:
             return [self._sound_filenames[lenght//2]]
 

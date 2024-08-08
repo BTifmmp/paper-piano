@@ -1,11 +1,10 @@
 import cv2
+import numpy as np
+from playsound import playsound
 import detection
-import validation
 import control_panel
 import piano_player
-from playsound import playsound
-import threading
-import numpy as np
+import validation
 
 
 def main():
