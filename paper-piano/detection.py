@@ -81,7 +81,7 @@ class PianoDetection:
         extraction = cv2.GaussianBlur(extraction, (11, 11), 2)
         extraction = cv2.adaptiveThreshold(extraction,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
             cv2.THRESH_BINARY_INV,11,2)
-        kernel = np.ones((4,4),np.uint8)
+        kernel = np.ones((5,5),np.uint8)
         extraction = cv2.morphologyEx(extraction, cv2.MORPH_OPEN, kernel)
         
         # Removes unwanted edges
@@ -107,6 +107,10 @@ class PianoDetection:
             # Filters small leftovers 
             if w > 6 and h > 6:
                 points.append((x+w/2, y+h/2))
+        
+        # No points detected
+        if not points:
+            return
         
         # Reshapes points for transform
         points = np.array(points, np.float32).reshape(-1, 1, 2)

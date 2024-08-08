@@ -2,13 +2,14 @@ import cv2
 import detection
 import validation
 import control_panel
+import piano_player
 from playsound import playsound
 import threading
 import numpy as np
 
 
 def main():
-    # Creates video capture 
+    # Creates video capture
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -20,6 +21,9 @@ def main():
     piano_det = detection.PianoDetection()
     hand_det = detection.HandDetection()
     validator = validation.TouchValidator()
+    
+    # Sound player
+    player = piano_player.PianoPlayer("../sounds")
 
     while True:
         # Update controls
@@ -35,24 +39,20 @@ def main():
         
         # Preapre frame for processing
         frame = cv2.flip(frame, 1)
-        frameRGB = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # RGB for mediapipe
         
         # Detect piano points
         if not ctrls.freeze_points.get():
             piano_det.process(frame, ctrls.blur.get()*2+1, ctrls.canny_ths1.get(), ctrls.canny_ths2.get())
         
         # Detect finger points
-        hand_det.process(frameRGB, ctrls.tracked_fingers)
+        hand_det.process(frame, ctrls.tracked_fingers)
         
         # Check which points should play sound
         indexes = validator.process(piano_det.piano_points, hand_det.fingertips, 
                                     ctrls.touch_distance.get(), ctrls.untouch_distance.get())
-    
+
         # Play sounds
-        for i in indexes:
-            # Starts a thread with sound to not block the loop execution
-            thread = threading.Thread(target=playsound, args=(f"../sounds/{i}.mp3",), daemon=True)
-            thread.start()
+        player.play_keys(len(piano_det.piano_points), indexes, piano_player.UNIFORM_SOUND_SELECTION)
             
         # Draws points and landmarks on original frame
         piano_det.draw_contour(frame)
@@ -71,8 +71,8 @@ def main():
         cv2.imshow("Main", display_main)
         cv2.imshow("Warped", display_warped)
         
-        # Quit when q pressed
-        if cv2.waitKey(1) == ord('q'):
+        # Quit program if any control panel window is closed or q pressed     
+        if cv2.waitKey(1) == ord('q') or ctrls.is_closed:
             ctrls.quit()
             break        
 

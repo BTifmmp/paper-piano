@@ -1,18 +1,30 @@
 import tkinter as tk
 
 class ControlPanel(tk.Tk):
-    def __init__(self):
+    def __init__(self, 
+                 freeze_points: bool = False, 
+                 blur: int = 10, 
+                 canny_ths1: int = 40,
+                 canny_ths2: int = 40,
+                 touch_distance: int = 10,
+                 untouch_distance: int = 15,
+                 tracked_fingers: list[int] = [8, 12]):
         """Creates a new tk window with controls for piano detection validation"""
         super().__init__()
         
         # Controlable variables
-        self.freeze_points = tk.BooleanVar(value=False)
-        self.blur = tk.IntVar(value=0)
-        self.canny_ths1 = tk.IntVar(value=0)
-        self.canny_ths2 = tk.IntVar(value=0)
-        self.touch_distance = tk.IntVar(value=0)
-        self.untouch_distance = tk.IntVar(value=0)
-        self.tracked_fingers = []
+        self.freeze_points = tk.BooleanVar(value=freeze_points)
+        self.blur = tk.IntVar(value=blur)
+        self.canny_ths1 = tk.IntVar(value=canny_ths1)
+        self.canny_ths2 = tk.IntVar(value=canny_ths2)
+        self.touch_distance = tk.IntVar(value=touch_distance)
+        self.untouch_distance = tk.IntVar(value=untouch_distance)
+        self.tracked_fingers = tracked_fingers
+        
+        self.is_closed = False
+        
+        self.bind("<Destroy>", self._window_closed)
+        self.bind('q', self._window_closed)
         
         # Set title
         self.title("Control Panel")
@@ -53,7 +65,7 @@ class ControlPanel(tk.Tk):
         self._fingers_buttons = []
         fingers = ["Thumb", "Index", "Middle", "Ring", "Pinky"]
         for i in range(5):
-            var = tk.BooleanVar()
+            var = tk.BooleanVar(value=(i*4+4 in self.tracked_fingers))
             cb = tk.Checkbutton(
                 self, text=f"{fingers[i]}", variable=var, indicatoron=False,
                 width=10, height=2, command=self._finger_toggle)
@@ -73,7 +85,7 @@ class ControlPanel(tk.Tk):
         self._toggle_button.config(text="Unfreeze Points" if self.freeze_points.get() else "Freeze Points")
         
     def _finger_toggle(self):
-        # Computes tracked fingers from checkboxes
+        # Computes tracked fingers from checkbottons
         self.tracked_fingers = []
         keypoint = 4 # Thumb
         for fb in self._fingers_buttons:
@@ -82,3 +94,7 @@ class ControlPanel(tk.Tk):
             
             keypoint += 4 # Next fingertip +4 from the previous
             
+    def _window_closed(self, ev):
+        self.is_closed = True
+        
+    
