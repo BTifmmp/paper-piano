@@ -51,7 +51,7 @@ def main():
                                     ctrls.touch_distance.get(), ctrls.untouch_distance.get())
 
         # Play sounds
-        player.play_keys(len(piano_det.piano_points), indexes, piano_player.UNIFORM_SOUND_SELECTION)
+        player.play_keys(len(piano_det.piano_points), indexes, piano_player.MIDDLE_SOUND_SELECTION)
             
         # Draws points and landmarks on original frame
         piano_det.draw_contour(frame)
