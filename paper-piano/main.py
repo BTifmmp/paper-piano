@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import cv2
 import numpy as np
 from playsound import playsound
@@ -22,7 +24,8 @@ def main():
     validator = validation.TouchValidator()
     
     # Sound player
-    player = piano_player.PianoPlayer("../sounds")
+    default_sounds_path = Path(__file__).parent.parent / "sounds"
+    player = piano_player.PianoPlayer(default_sounds_path)
 
     while True:
         # Update controls
@@ -51,7 +54,7 @@ def main():
                                     ctrls.touch_distance.get(), ctrls.untouch_distance.get())
 
         # Play sounds
-        player.play_keys(len(piano_det.piano_points), indexes, piano_player.MIDDLE_SOUND_SELECTION)
+        player.play_keys(len(piano_det.piano_points), indexes, piano_player.UNIFORM_SOUND_SELECTION)
             
         # Draws points and landmarks on original frame
         piano_det.draw_contour(frame)
