@@ -1,5 +1,6 @@
 # Drawn Piano with OpenCV and Mediapipe
 
+Demo video, play with sound on\
 [![Project video demo](https://img.youtube.com/vi/50WxalOTiOc/0.jpg)](https://youtu.be/50WxalOTiOc)
 
 ## Overview
