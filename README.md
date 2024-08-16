@@ -1,17 +1,16 @@
-# Drawn Piano with OpenCV and Mediapipe
+# Drawn Piano with OpenCV
 
 Demo video, play with sound on\
-[![Project video demo](https://img.youtube.com/vi/50WxalOTiOc/0.jpg)](https://youtu.be/50WxalOTiOc)
+[![Project video demo](https://img.youtube.com/vi/t-hFxrR4HwU/0.jpg)](https://youtu.be/t-hFxrR4HwU)
 
 ## Overview
 
-This project allows users to play a piano that is drawn on a piece of paper. Using the power of OpenCV and Mediapipe, the application tracks the user's fingers and plays the corresponding notes as they interact with the drawn piano keys.
+This project allows users to play a piano that is drawn on a piece of paper. Using the power of OpenCV, the application tracks if user's fingers are touching piano and plays the corresponding notes. Paper rectangle is detected using canny edge detection and contours. From rectangle the points are detected also using canny and contours. After finding points small snapshot (hardcoded 6x6) of each point is taken to be later used as a background for template matching.
 
 The project also includes a **Control Panel** built with Tkinter that enables users to adjust various settings, such as:
 
 - Adjusting OpenCV detection variables to improve piano detection accuracy.
-- Selecting which fingers to track for piano key interaction.
-- Modifying the distance threshold between the finger and the piano key to trigger a note.
+- Modifying the template match threshold used in checking if point is covered by finger.
 
 ## Installation
 

@@ -1,81 +1,75 @@
-import math
-from detection import Keypoint
+import cv2
+from cv2.typing import MatLike
+import numpy as np
 
-
-class TrackedPoint:
-    def __init__(self, position, touching_fingertips=[]):
-        self.position = position
-        self.fingertips = []
-
-
-class TouchValidator:
-    def __init__(self):
-        self.tracked_points = []
-
-    def process(
-        self, piano_points: list[tuple[float, float]], fingertips: list[Keypoint], 
-        touch_distance: float, untouch_distance: float
-        ) -> set[int]:
-        """
-        Checks if piano points are close enough to fingertip.
-        Returns indexes of piano points that were not previously being 
-        touched but are being touched now.
-        """
-        # Number of given points is diffrent than tracked points
-        if len(piano_points) != len(self.tracked_points):
-            # Creates clean tracked points
-            self._create_tracked_points(piano_points)
-
-        indexes = set()
-        i = 0 # Index of piano point
-        # For each piano point checks if any given fingertip should start/stop being tracked.
-        # Fingertip is removed from trackign only if its distance from piano point is higher
-        # than max_distance, if the fingertip wasnt detected in given frame it stays tracked.
-        for pp in piano_points:
-            for ft in fingertips:
-                is_touching = math.dist(pp, ft.position) < touch_distance
-                
-                ft_index =  self._get_fingertip_index(self.tracked_points[i].fingertips, ft)
-                is_tracked = ft_index != -1
-                
-                if is_tracked:
-                    # Fingertip is outside if its distance is geater than max_distance from previous position
-                    is_outside = math.dist(self.tracked_points[i].fingertips[ft_index].position, ft.position) > untouch_distance
-                    if is_outside:
-                        # Fingertip is no longer touching the piano point
-                        del self.tracked_points[i].fingertips[ft_index]
-                else:
-                    if is_touching:
-                        # Fingertip is not tracked, but touching point
-                        if len(self.tracked_points[i].fingertips) == 0:
-                            # Piano point is not touched by any finger
-                            indexes.add(i)
-                        
-                        self.tracked_points[i].fingertips.append(ft)
-                        
-                
-            i += 1
-                    
-        return indexes
-    
-    def _get_fingertip_index(self, tracked_fingertips: list[Keypoint], fingertip: Keypoint) -> int:
-        # Checks if fingertip is already tracked, returns index if true, otherwise -1 
-        j = 0
-        for tracked_ft in tracked_fingertips:
-            if self._are_fingertips_equal(fingertip, tracked_ft):                        
-                return j
-            j += 1
+class TouchValidator():
+    def __init__(self, probbing_area: int = 6):
+        self._probbing_area = probbing_area
+        self._templates = []
+        self._piano_points = []
+        self._is_pressed = []
         
-        return -1
+        self.test = []
     
-    def _are_fingertips_equal(self, ft1: Keypoint, ft2: Keypoint):
-        # Fingertips are equal if hand and keypoint number are the same
-        if ft1.hand == ft2.hand and ft1.number == ft2.number:
-            return True
-
-        return False
-
-    def _create_tracked_points(self, piano_points: list[tuple[float, float]]):
+    def initialize_points_images(self, frame: MatLike, piano_points: list[tuple[float, float]]):
+        """Creates image for for every point to be used later as a template"""
+        self._templates = []
+        self._piano_points = piano_points
+        
+        height, width = frame.shape[:2]
+    
         for pp in piano_points:
-            new_tracked = TrackedPoint(pp)
-            self.tracked_points.append(new_tracked)
+            # Initialize each point as not pressed
+            self._is_pressed.append(False)
+            
+            # Points of cropping rectangle
+            # Probbing is reduced to focus on the point
+            x = int(max(0, pp[0] - self._probbing_area))
+            y = int(max(3, pp[1] - self._probbing_area + 1))
+            w = int(min(x + self._probbing_area * 2, width))
+            h = int(min(y + (self._probbing_area - 1) * 2, height))
+            
+            # Crop frame
+            cropped = np.copy(frame[y:h, x:w])
+            self._templates.append(cropped)
+        
+    def process(self, frame: MatLike, match_threshold: float = 0.7) -> set[int]:
+        """Detects piano points hidden behind finger, return indexes of those points """
+        result = set() # Set of indicies
+        height, width = frame.shape[:2] 
+        for indx, pp in enumerate(self._piano_points):
+            # Points of cropping rectangle
+            x = int(max(0, pp[0] - self._probbing_area))
+            y = int(max(0, pp[1] - self._probbing_area + 1))
+            w = int(min(x + self._probbing_area * 2, width))
+            h = int(min(y + (self._probbing_area - 1) * 2, height))
+            
+            # Crop frame
+            cropped = np.copy(frame[y:h, x:w])
+            
+            # Tries to match a point to corresponding cropped frame
+            # If point is not detected it means there in no finger over it
+            is_point_detected, image = self._is_template_in_image(cropped, self._templates[indx], match_threshold)
+            
+            if is_point_detected:
+                if not self._is_pressed[indx]:
+                    # Point was not detected and wasnt previously pressed
+                    result.add(indx)
+                    self._is_pressed[indx] = True
+            else:
+                # Point was detected
+                self._is_pressed[indx] = False            
+        
+        return result    
+    
+    def _is_template_in_image(self, image, template, threshold=0.7):
+        result = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
+        
+        # Get the maximum match value
+        _, max_val, _, _ = cv2.minMaxLoc(result)
+        
+        # If the maximum match value is above the threshold, the object is present
+        if max_val >= threshold:
+            return False, result  # Point is present
+    
+        return True, result  # No Point detected

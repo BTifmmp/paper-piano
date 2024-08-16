@@ -1,8 +1,6 @@
-import os
 from pathlib import Path
 import cv2
 import numpy as np
-from playsound import playsound
 import detection
 import control_panel
 import piano_player
@@ -20,13 +18,13 @@ def main():
     
     # Creates detectors and validator
     piano_det = detection.PianoDetection()
-    hand_det = detection.HandDetection()
     validator = validation.TouchValidator()
     
     # Sound player
     default_sounds_path = Path(__file__).parent.parent / "sounds"
     player = piano_player.PianoPlayer(default_sounds_path)
-
+    
+    wasFrozen = False
     while True:
         # Update controls
         ctrls.update()
@@ -42,24 +40,23 @@ def main():
         # Preapre frame for processing
         frame = cv2.flip(frame, 1)
         
-        # Detect piano points
         if not ctrls.freeze_points.get():
+            # Detect piano points
             piano_det.process(frame, ctrls.blur.get()*2+1, ctrls.canny_ths1.get(), ctrls.canny_ths2.get())
-        
-        # Detect finger points
-        hand_det.process(frame, ctrls.tracked_fingers)
-        
+            wasFrozen = False
+        else:
+            if wasFrozen == False:
+                wasFrozen = True
+                validator.initialize_points_images(frame, piano_det.piano_points)
         # Check which points should play sound
-        indexes = validator.process(piano_det.piano_points, hand_det.fingertips, 
-                                    ctrls.touch_distance.get(), ctrls.untouch_distance.get())
+        indexes = validator.process(frame, ctrls.match_threshold.get()/100)
 
         # Play sounds
-        player.play_keys(len(piano_det.piano_points), indexes, piano_player.UNIFORM_SOUND_SELECTION)
+        player.play_keys(len(piano_det.piano_points), indexes, piano_player.MIDDLE_SOUND_SELECTION)
             
         # Draws points and landmarks on original frame
         piano_det.draw_contour(frame)
         piano_det.draw_points(frame)
-        hand_det.draw_landmarks(frame)
             
         # Converts biary from greyscale to rgb to stack them with color image
         main_bin_rgb = cv2.cvtColor(piano_det.frame_bin ,cv2.COLOR_GRAY2BGR)

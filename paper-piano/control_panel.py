@@ -6,9 +6,7 @@ class ControlPanel(tk.Tk):
                  blur: int = 10, 
                  canny_ths1: int = 40,
                  canny_ths2: int = 40,
-                 touch_distance: int = 10,
-                 untouch_distance: int = 15,
-                 tracked_fingers: list[int] = [8, 12]):
+                 match_threshold: int = 60):
         """Creates a new tk window with controls for piano detection validation"""
         super().__init__()
         
@@ -17,10 +15,7 @@ class ControlPanel(tk.Tk):
         self.blur = tk.IntVar(value=blur)
         self.canny_ths1 = tk.IntVar(value=canny_ths1)
         self.canny_ths2 = tk.IntVar(value=canny_ths2)
-        self.touch_distance = tk.IntVar(value=touch_distance)
-        self.untouch_distance = tk.IntVar(value=untouch_distance)
-        self.tracked_fingers = tracked_fingers
-        
+        self.match_threshold = tk.IntVar(value=match_threshold)
         self.is_closed = False
         
         self.bind("<Destroy>", self._window_closed)
@@ -37,48 +32,30 @@ class ControlPanel(tk.Tk):
         
         # Search points label
         label = tk.Label(self, text="Points Search", anchor="w")
-        label.grid(row=0, column=0, columnspan=5, padx=10, sticky='ew')
+        label.grid(row=0, column=0, columnspan=1, padx=10, sticky='ew')
 
         # Freeze points button
         self._toggle_button = tk.Checkbutton(
             self, variable=self.freeze_points, indicatoron=False,
-            width=10, height=2, command=self._freeze_toggle, onvalue=False, offvalue=True)
-        self._toggle_button.grid(row=1, column=0, columnspan=5, padx=10, sticky='ew')
+            width=40, height=2, command=self._freeze_toggle, onvalue=False, offvalue=True)
+        self._toggle_button.grid(row=1, column=0, columnspan=1, padx=10, sticky='ew')
         self._freeze_toggle() # Update text
 
         # Paper detection sliders
         slider = tk.Scale(self, variable=self.blur, from_=0, to=30, 
                           orient=tk.HORIZONTAL, label="Blur Strength")
-        slider.grid(row=2, column=0, columnspan=5, padx=10, sticky='ew')
+        slider.grid(row=2, column=0, columnspan=1, padx=10, sticky='ew')
         slider = tk.Scale(self, variable=self.canny_ths1, from_=0, to=200, 
                           orient=tk.HORIZONTAL, label="Canny Threshold 1")
-        slider.grid(row=3, column=0, columnspan=5, padx=10, sticky='ew')
+        slider.grid(row=3, column=0, columnspan=1, padx=10, sticky='ew')
         slider = tk.Scale(self, variable=self.canny_ths2, from_=0, to=200, 
                           orient=tk.HORIZONTAL, label="Canny Threshold 2")
-        slider.grid(row=4, column=0, columnspan=5, padx=10, sticky='ew')
+        slider.grid(row=4, column=0, columnspan=1, padx=10, sticky='ew')
         
-        # Tracked Fingers label
-        label = tk.Label(self, text="Tracked fingers", anchor="w")
-        label.grid(row=5, column=0, columnspan=5, padx=10, sticky='ew')
-
-        # Tracked fingers checkbuttons
-        self._fingers_buttons = []
-        fingers = ["Thumb", "Index", "Middle", "Ring", "Pinky"]
-        for i in range(5):
-            var = tk.BooleanVar(value=(i*4+4 in self.tracked_fingers))
-            cb = tk.Checkbutton(
-                self, text=f"{fingers[i]}", variable=var, indicatoron=False,
-                width=10, height=2, command=self._finger_toggle)
-            cb.grid(row=6, column=i, padx=10, pady=10, sticky='ew')
-            self._fingers_buttons.append(var)
-
-        # Touch validation sliders
-        slider = tk.Scale(self, variable=self.touch_distance, from_=0, to=30, 
-                          orient=tk.HORIZONTAL, label="Touch detection distance")
-        slider.grid(row=7, column=0, columnspan=5, padx=10, pady=5, sticky='ew')
-        slider = tk.Scale(self, variable=self.untouch_distance, from_=0, to=30, 
-                          orient=tk.HORIZONTAL, label="Untouch detection distance")
-        slider.grid(row=8, column=0, columnspan=5, padx=10, pady=5, sticky='ew')
+        # Validation - match threshold
+        slider = tk.Scale(self, variable=self.match_threshold, from_=40, to=90, 
+                          orient=tk.HORIZONTAL, label="Match threshold")
+        slider.grid(row=5, column=0, columnspan=1, padx=10, pady=10, sticky='ew')
     
     def _freeze_toggle(self):
         # Changes text of freeze button

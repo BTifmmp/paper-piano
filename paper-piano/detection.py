@@ -85,7 +85,7 @@ class PianoDetection:
         extraction = cv2.morphologyEx(extraction, cv2.MORPH_OPEN, kernel)
         
         # Removes unwanted edges
-        extraction = add_inside_border(extraction, 15)
+        extraction = add_inside_border(extraction, 10)
         
         # Thicken cirles to make them easier to detect
         kernel = np.ones((3,3),np.uint8)
@@ -160,53 +160,7 @@ class PianoDetection:
                 position = (int(point[0]-10), int(point[1]-10))
                 cv2.putText(img, text, position, font, font_scale, color, thickness)
                 i+=1
-
-class HandDetection:
-    def __init__(self):
-        self.fingertips = []
-        self.hands = _mp_hands.Hands(
-            max_num_hands=2,
-            model_complexity=1,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-            )
-        self.results = None
-        
-    def process(self, frame: MatLike, fingertips: list[int] = [8]):
-        """Extracts fingertips data from the frame"""
-        # Convert BGR to RGB
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        self.results = self.hands.process(frame)
-        
-        # Reset fingertips
-        self.fingertips = []
-        
-        # Procces detected hands
-        if self.results.multi_hand_landmarks:
-            for landmarks, handedness in zip(self.results.multi_hand_landmarks, self.results.multi_handedness):
-                hand_type = handedness.classification[0].label
-                for tip in fingertips:
-                    landmark = landmarks.landmark[tip]
-                    
-                    # Find positon on frame
-                    x = int(landmark.x * frame.shape[1])
-                    y = int(landmark.y * frame.shape[0])
-                    
-                    # Create new keypoint
-                    new_tip = Keypoint(hand_type, tip, (x,y))
-                    self.fingertips.append(new_tip)
-            
-    def draw_landmarks(self, img):
-        """
-        Draws default hands landmarks
-        """
-        if not self.results.multi_hand_landmarks:
-            return
-        
-        for landmarks in self.results.multi_hand_landmarks:
-            _mp_drawing.draw_landmarks(img, landmarks, _mp_hands.HAND_CONNECTIONS)
-    
+   
     
 def order_points(pts: MatLike) -> MatLike:
     """Orders 4 points to be in clockwise order starting from top left"""
